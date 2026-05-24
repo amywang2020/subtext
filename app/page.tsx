@@ -484,9 +484,17 @@ export default function SubtextApp() {
   useEffect(() => {
     const stored = localStorage.getItem('subtext_reader_word')
     if (stored) { setReaderWord(stored); return }
-    const word = READER_WORDS[Math.floor(Math.random() * READER_WORDS.length)]
-    localStorage.setItem('subtext_reader_word', word)
-    setReaderWord(word)
+    fetch('/api/word')
+      .then(r => r.json())
+      .then(({ word }: { word: string }) => {
+        localStorage.setItem('subtext_reader_word', word)
+        setReaderWord(word)
+      })
+      .catch(() => {
+        const word = READER_WORDS[Math.floor(Math.random() * READER_WORDS.length)]
+        localStorage.setItem('subtext_reader_word', word)
+        setReaderWord(word)
+      })
   }, [])
 
   useEffect(() => {

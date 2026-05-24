@@ -1,3 +1,16 @@
+const READER_WORDS = [
+  'ash', 'aspen', 'bay', 'birch', 'brine', 'cairn', 'chalk', 'cinder',
+  'clay', 'crest', 'dew', 'dusk', 'eddy', 'ember', 'fen', 'fern',
+  'flint', 'frost', 'gale', 'glen', 'gorse', 'gust', 'haze', 'heath',
+  'heron', 'hull', 'hush', 'inlet', 'iris', 'jade', 'kelp', 'kite',
+  'knoll', 'larch', 'leaf', 'loch', 'mesa', 'mist', 'moor', 'moss',
+  'murk', 'nook', 'oak', 'opal', 'peat', 'pine', 'pool', 'quill',
+  'rain', 'reed', 'rime', 'roan', 'rust', 'sage', 'salt', 'shale',
+  'silk', 'silt', 'slate', 'smoke', 'soot', 'spar', 'spire', 'still',
+  'stone', 'swell', 'tarn', 'teal', 'tern', 'thaw', 'tide', 'thorn',
+  'turf', 'umber', 'vale', 'veil', 'wick', 'wisp', 'wold', 'wren', 'yew',
+]
+
 export interface Submission {
   id: string
   timestamp: string
@@ -59,4 +72,32 @@ export async function clearSubmissions(): Promise<void> {
   } else {
     localSubmissions.length = 0
   }
+}
+
+// ─── Word assignment ──────────────────────────────────────────────────────────
+
+function shuffle(arr: string[]): string[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+const localWordPool = shuffle(READER_WORDS)
+
+export async function assignReaderWord(): Promise<string> {
+  if (isUpstashConfigured()) {
+    const count = await upstash(['SCARD', 'subtext:word_pool'])
+    if ((count as number) === 0) {
+      await upstash(['SADD', 'subtext:word_pool', ...READER_WORDS])
+    }
+    const word = await upstash(['SPOP', 'subtext:word_pool'])
+    if (word) return word as string
+  } else {
+    const word = localWordPool.shift()
+    if (word) return word
+  }
+  return READER_WORDS[Math.floor(Math.random() * READER_WORDS.length)]
 }
