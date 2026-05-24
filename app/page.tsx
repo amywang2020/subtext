@@ -4,19 +4,15 @@ import { useState, useEffect, useRef } from 'react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Phase = 'landing' | 'select' | 'intake' | 'transition' | 'story'
-type TransitionStep = 'blank' | 'moment' | 'familiar'
+type Phase = 'landing' | 'intake' | 'transition' | 'story' | 'select'
+type TransitionStep = 'blank' | 'moment' | 'familiar' | 'fixed' | 'brought'
 
 interface IntakeAnswers {
-  location: string
-  light: string
-  tomorrow: string
-  alone: string
-}
-
-interface DetectedCtx {
-  time: string
-  place: string
+  sound: string
+  object: string
+  presence: string
+  phone: string
+  goingAfter: string
 }
 
 interface Story {
@@ -81,33 +77,55 @@ const STORIES: Story[] = [
   },
 ]
 
+const TABLE_STORY = STORIES.find(s => s.id === 'table')!
+
+// ─── Reader words ─────────────────────────────────────────────────────────────
+
+const READER_WORDS = [
+  'ash', 'aspen', 'bay', 'birch', 'brine', 'cairn', 'chalk', 'cinder',
+  'clay', 'crest', 'dew', 'dusk', 'eddy', 'ember', 'fen', 'fern',
+  'flint', 'frost', 'gale', 'glen', 'gorse', 'gust', 'haze', 'heath',
+  'heron', 'hull', 'hush', 'inlet', 'iris', 'jade', 'kelp', 'kite',
+  'knoll', 'larch', 'leaf', 'loch', 'mesa', 'mist', 'moor', 'moss',
+  'murk', 'nook', 'oak', 'opal', 'peat', 'pine', 'pool', 'quill',
+  'rain', 'reed', 'rime', 'roan', 'rust', 'sage', 'salt', 'shale',
+  'silk', 'silt', 'slate', 'smoke', 'soot', 'spar', 'spire', 'still',
+  'stone', 'swell', 'tarn', 'teal', 'tern', 'thaw', 'tide', 'thorn',
+  'turf', 'umber', 'vale', 'veil', 'wick', 'wisp', 'wold', 'wren', 'yew',
+]
+
 // ─── Questions ────────────────────────────────────────────────────────────────
 
-const QUESTIONS = [
+const QUESTIONS: Array<{
+  id: string
+  prompt: string
+  options?: string[]
+  placeholder?: string
+}> = [
   {
-    id: 'location',
-    prompt: 'Are you inside or outside?',
-    options: ['inside', 'outside'],
+    id: 'sound',
+    prompt: 'What does it sound like where you are?',
+    placeholder: '',
   },
   {
-    id: 'light',
-    prompt: 'What does the light look like?',
-    options: [
-      'thin and artificial',
-      'warm, coming through a window',
-      'already gone',
-      "I'm not paying attention",
-    ],
+    id: 'object',
+    prompt: 'What\'s the nearest object to your left hand right now?',
+    placeholder: '',
   },
   {
-    id: 'tomorrow',
-    prompt: 'Do you have somewhere to be tomorrow?',
-    options: ['yes, early', 'yes, but not urgent', 'nothing', "I don't know yet"],
+    id: 'presence',
+    prompt: 'Right now, are you mostly here or mostly somewhere else?',
+    options: ['mostly here', 'split', 'mostly somewhere else'],
   },
   {
-    id: 'alone',
-    prompt: 'Are you alone?',
-    options: ['yes', 'no, but I might as well be', 'no'],
+    id: 'phone',
+    prompt: 'Is your phone face-up or face-down right now?',
+    options: ['face-up', 'face-down', 'I don\'t have it with me'],
+  },
+  {
+    id: 'goingAfter',
+    prompt: 'After this, where are you going?',
+    placeholder: '',
   },
 ]
 
@@ -124,21 +142,6 @@ function formatTime(date: Date): string {
   const hour = h % 12 || 12
   const min = m.toString().padStart(2, '0')
   return `${hour}:${min} ${period}`
-}
-
-async function detectCtx(): Promise<DetectedCtx> {
-  const time = formatTime(new Date())
-  try {
-    const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) })
-    if (!res.ok) throw new Error('ipapi failed')
-    const data = await res.json()
-    const place =
-      [data.city, data.region, data.country_name].filter(Boolean).join(', ') ||
-      Intl.DateTimeFormat().resolvedOptions().timeZone
-    return { time, place }
-  } catch {
-    return { time, place: Intl.DateTimeFormat().resolvedOptions().timeZone }
-  }
 }
 
 // ─── Landing ──────────────────────────────────────────────────────────────────
@@ -167,13 +170,14 @@ function Landing({ onBegin }: { onBegin: () => void }) {
 
 // ─── StorySelect ──────────────────────────────────────────────────────────────
 
-function StorySelect({ onSelect }: { onSelect: (story: Story) => void }) {
+function StorySelect({ onSelect, excludeId }: { onSelect: (story: Story) => void; excludeId?: string }) {
+  const stories = excludeId ? STORIES.filter(s => s.id !== excludeId) : STORIES
   return (
     <div className="screen screen-dark">
       <div className="select-inner">
-        <p className="select-eyebrow">seven scenes</p>
+        <p className="select-eyebrow">{stories.length} scenes</p>
         <ul className="select-list">
-          {STORIES.map((story) => (
+          {stories.map((story) => (
             <li
               key={story.id}
               className="select-item"
@@ -200,6 +204,14 @@ function IntakeQuestion({
   onSelect: (id: string, val: string) => void
 }) {
   const [selected, setSelected] = useState<string | null>(null)
+  const [text, setText] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!question.options) {
+      setTimeout(() => inputRef.current?.focus(), 300)
+    }
+  }, [question.options])
 
   function handleOptionClick(val: string) {
     if (selected !== null) return
@@ -207,24 +219,53 @@ function IntakeQuestion({
     setTimeout(() => onSelect(question.id, val), 180)
   }
 
+  function handleTextSubmit() {
+    const val = text.trim()
+    if (!val) return
+    onSelect(question.id, val)
+  }
+
   return (
     <div className="intake-screen">
       <div className="intake-inner">
         <p className="intake-prompt">{question.prompt}</p>
-        <div className="intake-options">
-          {question.options.map((opt, i) => (
+        {question.options ? (
+          <div className="intake-options">
+            {question.options.map((opt, i) => (
+              <button
+                key={opt}
+                className={`intake-option${
+                  selected === null ? '' : selected === opt ? ' selected' : ' dimmed'
+                }`}
+                style={{ animationDelay: `${i * 0.08 + 0.15}s` }}
+                onClick={() => handleOptionClick(opt)}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="intake-text-wrap">
+            <input
+              ref={inputRef}
+              className="intake-text-input"
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleTextSubmit()}
+              placeholder={question.placeholder ?? ''}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+            />
             <button
-              key={opt}
-              className={`intake-option${
-                selected === null ? '' : selected === opt ? ' selected' : ' dimmed'
-              }`}
-              style={{ animationDelay: `${i * 0.08 + 0.15}s` }}
-              onClick={() => handleOptionClick(opt)}
+              className={`intake-text-submit${text.trim() ? ' visible' : ''}`}
+              onClick={handleTextSubmit}
             >
-              {opt}
+              →
             </button>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -232,13 +273,19 @@ function IntakeQuestion({
 
 // ─── TransitionScreen ─────────────────────────────────────────────────────────
 
+const TRANSITION_LINES: Partial<Record<TransitionStep, string>> = {
+  moment:   'One moment.',
+  familiar: 'This may feel familiar.',
+  fixed:    'The story is fixed.',
+  brought:  'What changes is what you brought.',
+}
+
 function TransitionScreen({ step }: { step: TransitionStep }) {
-  if (step === 'blank') return <div className="screen screen-dark" />
+  const text = TRANSITION_LINES[step]
+  if (!text) return <div className="screen screen-dark" />
   return (
     <div className="screen screen-dark">
-      <p className="transition-text" key={step}>
-        {step === 'moment' ? 'One moment.' : 'This may feel familiar.'}
-      </p>
+      <p className="transition-text" key={step}>{text}</p>
     </div>
   )
 }
@@ -262,19 +309,58 @@ function WhatModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+// ─── EvalQuestion ────────────────────────────────────────────────────────────
+
+function EvalQuestion() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="eval-question-wrap">
+      <p className="eval-question">
+        did this find you?{' '}
+        <button className="eval-what-btn" onClick={() => setOpen(o => !o)}>
+          {open ? 'close' : 'what does this mean?'}
+        </button>
+      </p>
+      {open && (
+        <p className="eval-what-text">
+          You answered five questions. This story was built from them — not to describe you,
+          but to arrive at your specific moment. We&rsquo;re asking how little it takes to produce
+          that sensation.
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ─── StoryView ────────────────────────────────────────────────────────────────
 
 function StoryView({
   personalText,
   newsText,
   done,
-  onReset,
+  showEval,
+  evalRating,
+  evalNote,
+  evalSubmitted,
+  readerWord,
+  onRate,
+  onNoteChange,
+  onEvalSubmit,
+  onReadAnother,
   onWhatIsThis,
 }: {
   personalText: string
   newsText: string
   done: boolean
-  onReset: () => void
+  showEval: boolean
+  evalRating: string
+  evalNote: string
+  evalSubmitted: boolean
+  readerWord: string
+  onRate: (r: string) => void
+  onNoteChange: (n: string) => void
+  onEvalSubmit: () => void
+  onReadAnother: () => void
   onWhatIsThis: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -289,7 +375,7 @@ function StoryView({
   }, [personalText, newsText])
 
   return (
-    <div className="story-screen screen-light" ref={scrollRef}>
+    <div className="story-screen" ref={scrollRef}>
       <div className="story-grid">
 
         {/* Left: the record */}
@@ -321,11 +407,52 @@ function StoryView({
         {/* Ending — spans both columns */}
         {done && (
           <div className="ending-block">
-            <p className="ending-line">That was the only version.</p>
-            <div className="ending-actions">
-              <button className="ending-btn" onClick={onReset}>Read another</button>
-              <button className="ending-btn" onClick={onWhatIsThis}>What was this?</button>
-            </div>
+            {showEval && !evalSubmitted && (
+              <>
+                <EvalQuestion />
+                <div className="eval-options">
+                  {(['yes', 'somewhat', 'not really'] as const).map(r => (
+                    <button
+                      key={r}
+                      className={`eval-option${evalRating === r ? ' eval-selected' : ''}`}
+                      onClick={() => onRate(r)}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                {evalRating && (
+                  <div className="eval-text-wrap">
+                    <input
+                      className="eval-text-input"
+                      type="text"
+                      placeholder="what did it get right? (optional)"
+                      value={evalNote}
+                      onChange={e => onNoteChange(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && onEvalSubmit()}
+                      autoFocus
+                      autoComplete="off"
+                    />
+                    <button className="eval-submit-btn" onClick={onEvalSubmit}>→</button>
+                  </div>
+                )}
+              </>
+            )}
+            {showEval && evalSubmitted && (
+              <>
+                <p className="eval-thanks">thank you.</p>
+                <div className="ending-actions">
+                  <button className="ending-btn" onClick={onReadAnother}>read another</button>
+                  <button className="ending-btn" onClick={onWhatIsThis}>what was this?</button>
+                </div>
+              </>
+            )}
+            {!showEval && (
+              <div className="ending-actions">
+                <button className="ending-btn" onClick={onReadAnother}>read another</button>
+                <button className="ending-btn" onClick={onWhatIsThis}>what was this?</button>
+              </div>
+            )}
           </div>
         )}
 
@@ -339,18 +466,28 @@ function StoryView({
 export default function SubtextApp() {
   const [phase, setPhase] = useState<Phase>('landing')
   const [transitionStep, setTransitionStep] = useState<TransitionStep>('blank')
-  const [selectedStory, setSelectedStory] = useState<Story | null>(null)
+  const [selectedStory, setSelectedStory] = useState<Story>(TABLE_STORY)
+  const [readMode, setReadMode] = useState<'primary' | 'secondary'>('primary')
+  const personalReadyRef = useRef(false)
   const [qIndex, setQIndex] = useState(0)
   const [answers, setAnswers] = useState<Partial<IntakeAnswers>>({})
-  const [detected, setDetected] = useState<DetectedCtx | null>(null)
+  const [capturedIntake, setCapturedIntake] = useState<Record<string, string> | null>(null)
   const [personalText, setPersonalText] = useState('')
   const [newsText, setNewsText] = useState('')
   const [storyDone, setStoryDone] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [evalRating, setEvalRating] = useState('')
+  const [evalNote, setEvalNote] = useState('')
+  const [evalSubmitted, setEvalSubmitted] = useState(false)
+  const [readerWord, setReaderWord] = useState('')
 
   useEffect(() => {
-    if (phase === 'intake') detectCtx().then(setDetected)
-  }, [phase])
+    const stored = localStorage.getItem('subtext_reader_word')
+    if (stored) { setReaderWord(stored); return }
+    const word = READER_WORDS[Math.floor(Math.random() * READER_WORDS.length)]
+    localStorage.setItem('subtext_reader_word', word)
+    setReaderWord(word)
+  }, [])
 
   useEffect(() => {
     if (phase === 'story') {
@@ -359,11 +496,6 @@ export default function SubtextApp() {
       document.documentElement.classList.remove('story-active')
     }
   }, [phase])
-
-  function handleStorySelect(story: Story) {
-    setSelectedStory(story)
-    setPhase('intake')
-  }
 
   function handleSelect(id: string, val: string) {
     const updated = { ...answers, [id]: val } as Partial<IntakeAnswers>
@@ -377,27 +509,43 @@ export default function SubtextApp() {
 
   async function runTransition(finalAnswers: IntakeAnswers) {
     setPhase('transition')
+    personalReadyRef.current = false
+
+    streamStory(finalAnswers)
+
     setTransitionStep('blank')
     await wait(700)
     setTransitionStep('moment')
     await wait(2200)
+    setTransitionStep('blank')
+    await wait(500)
     setTransitionStep('familiar')
-    await wait(2200)
+    await wait(2400)
+    setTransitionStep('blank')
+    await wait(500)
+    setTransitionStep('fixed')
+    await wait(2000)
+    setTransitionStep('brought')
+    await wait(2500)
+
+    while (!personalReadyRef.current) {
+      await wait(100)
+    }
+
     setPhase('story')
-    streamStory(finalAnswers)
   }
 
   async function streamStory(finalAnswers: IntakeAnswers) {
-    const ctx = detected ?? { time: formatTime(new Date()), place: Intl.DateTimeFormat().resolvedOptions().timeZone }
     const intake = {
-      time: ctx.time,
-      place: ctx.place,
-      light: finalAnswers.light,
-      location: finalAnswers.location,
-      tomorrow: finalAnswers.tomorrow,
-      alone: finalAnswers.alone,
-      storyId: selectedStory?.id ?? 'table',
+      time: formatTime(new Date()),
+      sound: finalAnswers.sound,
+      object: finalAnswers.object,
+      presence: finalAnswers.presence,
+      phone: finalAnswers.phone,
+      goingAfter: finalAnswers.goingAfter,
+      storyId: selectedStory.id,
     }
+    setCapturedIntake(intake)
 
     try {
       const res = await fetch('/api/generate', {
@@ -427,11 +575,26 @@ export default function SubtextApp() {
           try { parsed = JSON.parse(raw) } catch { continue }
 
           if (parsed.type === 'done') {
-            setTimeout(() => setStoryDone(true), 1500)
+            setTimeout(() => setStoryDone(true), 5000)
             return
           }
           if (parsed.type === 'personal' && parsed.text) {
-            setPersonalText((prev) => prev + parsed.text)
+            const chunk = parsed.text as string
+            personalReadyRef.current = true
+            if (chunk.length > 150) {
+              const tokens = chunk.split(/(\s+)/)
+              let i = 0
+              const reveal = () => {
+                if (i >= tokens.length) return
+                const batch = tokens.slice(i, i + 4).join('')
+                setPersonalText(prev => prev + batch)
+                i += 4
+                setTimeout(reveal, 22)
+              }
+              reveal()
+            } else {
+              setPersonalText(prev => prev + chunk)
+            }
           }
           if (parsed.type === 'news' && parsed.text) {
             setNewsText((prev) => prev + parsed.text)
@@ -444,23 +607,58 @@ export default function SubtextApp() {
     }
   }
 
-  function reset() {
-    setPhase('landing')
-    setTransitionStep('blank')
-    setSelectedStory(null)
+  async function handleEvalSubmit() {
+    try {
+      await fetch('/api/eval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          intake: capturedIntake,
+          personalText,
+          rating: evalRating,
+          note: evalNote,
+          readerWord,
+        }),
+      })
+    } catch { /* silent fail — demo continues regardless */ }
+    setEvalSubmitted(true)
+  }
+
+  function handleReadAnother() {
+    setPhase('select')
+    setReadMode('secondary')
+    personalReadyRef.current = false
     setQIndex(0)
     setAnswers({})
-    setDetected(null)
+    setCapturedIntake(null)
     setPersonalText('')
     setNewsText('')
     setStoryDone(false)
-    setShowModal(false)
+    setSelectedStory(TABLE_STORY)
   }
 
   return (
     <>
-      {phase === 'landing' && <Landing onBegin={() => setPhase('select')} />}
-      {phase === 'select' && <StorySelect onSelect={handleStorySelect} />}
+      {readerWord && (
+        <span className={`reader-word${phase === 'story' ? ' reader-word-light' : ''}`}>
+          {readerWord}
+        </span>
+      )}
+      {phase === 'landing' && <Landing onBegin={() => setPhase('intake')} />}
+      {phase === 'select' && (
+        <StorySelect
+          excludeId="table"
+          onSelect={(story) => {
+            setSelectedStory(story)
+            setQIndex(0)
+            setAnswers({})
+            setPersonalText('')
+            setNewsText('')
+            setStoryDone(false)
+            setPhase('intake')
+          }}
+        />
+      )}
       {phase === 'intake' && (
         <IntakeQuestion
           key={qIndex}
@@ -474,7 +672,15 @@ export default function SubtextApp() {
           personalText={personalText}
           newsText={newsText}
           done={storyDone}
-          onReset={reset}
+          showEval={readMode === 'primary'}
+          evalRating={evalRating}
+          evalNote={evalNote}
+          evalSubmitted={evalSubmitted}
+          readerWord={readerWord}
+          onRate={setEvalRating}
+          onNoteChange={setEvalNote}
+          onEvalSubmit={handleEvalSubmit}
+          onReadAnother={handleReadAnother}
           onWhatIsThis={() => setShowModal(true)}
         />
       )}

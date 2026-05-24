@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 
 // ─── Stories ──────────────────────────────────────────────────────────────────
 
-const STORIES: Record<string, { architecture: string; newsEvent: string }> = {
+const STORIES: Record<string, { architecture: string; newsEvent: string; closingLine?: string }> = {
   border: {
     architecture: `A woman drives her elderly mother through the town where the mother grew up in south Texas. The mother keeps pointing to lots where houses used to be, and the daughter keeps saying yes, I know, even when she doesn't know. The fields look different. Neither of them says what they mean by that.`,
     newsEvent: `Border wall construction in south Texas; eminent domain seizures of private land along the Rio Grande; families whose property has been taken or divided; the physical transformation of towns and agricultural land in the construction corridor.`,
@@ -30,35 +30,73 @@ const STORIES: Record<string, { architecture: string; newsEvent: string }> = {
   table: {
     architecture: `A social gathering — dinner or a long lunch. Sofía has her phone face-up on the table. Everyone has noticed. Nobody says anything yet. Gossip: someone asks why she's so distracted; someone mentions the divorce. Spring break comes up. Someone complains about Puerto Vallarta — the cartel situation, itineraries changed. Sofía looks up. Her grandmother lives in Mexico. She has spent all day waiting to hear back.`,
     newsEvent: `Cartel violence in Mexico, particularly in tourist and border regions including Jalisco and Nayarit; U.S. State Department travel advisories; the impact of ongoing violence on both travelers and residents; the experience of families divided across the U.S.-Mexico border living with sustained uncertainty.`,
+    closingLine: `\n\nSomewhere, her grandmother's phone rings into whatever room it's in.`,
   },
 }
 
 // ─── Prompts ──────────────────────────────────────────────────────────────────
 
-const LITERARY_SYSTEM = `You are a literary fiction writer working in the tradition of autofiction and witness literature. Close third person. Present tense. Compressed, precise prose. You do not explain. You show.`
+const LITERARY_SYSTEM = `You are a literary fiction writer working in the tradition of autofiction and witness literature. Close third person. Present tense. Compressed, precise prose. You do not explain. You show. Dialogue is rendered with standard quotation marks, not em dashes.`
 
 const NEWS_SYSTEM = `You are a wire-service journalist writing in the style of AP or Reuters. Third person, past tense. Economical, factual, precise.`
 
-function buildPersonalPrompt(architecture: string, intake: Record<string, string>): string {
+function buildPersonalPrompt(architecture: string, newsEvent: string, intake: Record<string, string>): string {
   return `Generate a prose piece of 280–320 words. Output only the story — no title, no preamble.
 
 THE FIXED SITUATION (the plot does not change):
 ${architecture}
 
-READER CONTEXT (weave in without naming or announcing):
-— Time: ${intake.time}
-— Place: ${intake.place}
-— Light: ${intake.light}
-— Setting: ${intake.location}
-— Tomorrow: ${intake.tomorrow}
-— Alone: ${intake.alone}
+STRUCTURAL CONTEXT (the systemic pressure behind the scene — do not name it or editorialize; let it weight the texture):
+${newsEvent}
+
+READER CONTEXT — two layers, both invisible:
+
+SENSORY (embed concretely, do not announce):
+— Ambient sound: ${intake.sound}
+— Object nearest to their hand: ${intake.object}
+— Current time: ${intake.time}
+— After this, they are going: ${intake.goingAfter}
+
+PSYCHOLOGICAL (calibrate register, do not name):
+— Where their attention is right now: ${intake.presence}
+— Where their phone is: ${intake.phone}
 
 INSTRUCTIONS:
-— Open with a sentence that places the reader in time and environment — not as setup, but as weather. This is where recognition begins.
-— Let the reader's context inhabit the threshold: their light, their hour, their city are the room the characters are in.
-— Somewhere in the middle: one line that feels slightly too precise — pressing on the fourth wall without breaking it. (Use second person only here, once, briefly.)
-— The facts of the situation do not change. What changes is what it feels like to be in the room.
-— No dialogue tags. One closing image. Stop at 320 words.`
+— Open with a sentence of ambient texture — sound, temperature, the weight of the hour. Not a description of the room. Not "the light." The first sentence is weather.
+— The sound can find one moment in the scene — a background detail, unannounced, as if it were always there.
+— The object is not a prop. Do not place it in the story. Use it to read the reader's environment: what kind of space they're in, what their afternoon looks like, what social register surrounds them. Let that inference color the atmosphere without the object appearing.
+— The psychological layer calibrates Sofía's register. If the reader is mostly somewhere else: Sofía's fear is physically present, embodied, hard to keep still — her hands, her posture, small involuntary movements. If the reader is mostly here: Sofía is composed on the surface, dissociated, observing the table from a slight remove, the fear running underneath.
+— Sofía's phone is face-up on the table — this is fixed and does not change. The reader's phone answer calibrates its weight in the room: face-up readers get a phone that pulls at the edges of every sentence; face-down readers get one that is present but held at a distance, suppressed.
+— Do not surface the intake answers as observations. Invisible scaffolding, not reported data.
+— The story's geography is fixed — do not relocate it. Reader context changes texture, not setting.
+— Somewhere in the middle: one line in second person that feels slightly too precise — as if the story knows something about the reader without being told. It must not echo any intake answer directly — no specific times, no clock numbers, no named objects, no locations, nothing from the intake. The recognition must come from emotional logic, not reported data: something about the texture of waiting, the weight of an unanswered hour, the particular quality of half-attention. It lands as uncanny because it names a feeling, not a fact. One sentence only.
+— Stay outside. No interior memory chains. What the character notices is external: objects, light, bodies, sound, time. Interiority lives in what they do with their hands, not what they remember. Avoid similes — precision over imagery. If you reach for "like" or "as if," cut it and find the direct observation instead.
+— No names for anyone except Sofía. The other people at the table are voices, gestures, pronouns. They do not have identities — only opinions and obliviousness.
+— Sofía has not heard from her grandmother all day. Do not invent a call, a notification, or any incoming contact. The tension is the sustained absence — the phone that hasn't rung, the silence she is waiting inside of.
+— Use at most one class or status marker for the table guests. The obliviousness of the conversation carries the register.
+— No dialogue tags. Do not write a closing line — stop before the final beat. Reach a complete sentence, then stop. Hard limit: 300 words.`
+}
+
+function buildGenericPrompt(architecture: string, newsEvent: string, intake: Record<string, string>): string {
+  return `Generate a prose piece of 280–320 words. Output only the story — no title, no preamble.
+
+THE FIXED SITUATION (the plot does not change):
+${architecture}
+
+STRUCTURAL CONTEXT (the systemic pressure — do not name it; let it weight the texture):
+${newsEvent}
+
+READER CONTEXT — embed invisibly:
+— Ambient sound: ${intake.sound}
+— Current time: ${intake.time}
+— After this, they are going: ${intake.goingAfter}
+
+INSTRUCTIONS:
+— Open with a sentence of ambient texture — sound, temperature, the weight of the hour.
+— Embed the sound as a background detail, unannounced, as if it were always there.
+— Present tense. Close third person. Compressed, precise prose.
+— No explanation. Show. No similes.
+— Stop at 300 words.`
 }
 
 function buildNewsPrompt(newsEvent: string): string {
@@ -74,6 +112,72 @@ INSTRUCTIONS:
 — Just the record. Stop at 180 words.`
 }
 
+const OPENROUTER_HEADERS = {
+  Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+  'Content-Type': 'application/json',
+  'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001',
+  'X-Title': 'Subtext',
+}
+
+// ─── Buffered generation ──────────────────────────────────────────────────────
+
+async function generateOpenRouter(system: string, prompt: string): Promise<string> {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: OPENROUTER_HEADERS,
+    body: JSON.stringify({
+      model: 'anthropic/claude-opus-4.7',
+      stream: false,
+      max_tokens: 700,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: prompt },
+      ],
+    }),
+  })
+  const data = await res.json()
+  if (!data.choices?.[0]?.message?.content) {
+    console.error('[subtext] OpenRouter generate error:', JSON.stringify(data).slice(0, 600))
+  }
+  return data.choices?.[0]?.message?.content ?? ''
+}
+
+// ─── Validation ───────────────────────────────────────────────────────────────
+
+async function validateStory(text: string, objectWord: string): Promise<boolean> {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: OPENROUTER_HEADERS,
+    body: JSON.stringify({
+      model: 'anthropic/claude-haiku-4.5',
+      stream: false,
+      max_tokens: 150,
+      messages: [{
+        role: 'user',
+        content: `Check this story for specific problems. Reply with JSON only: {"valid": true} or {"valid": false, "issues": ["..."]}.
+
+STORY:
+${text}
+
+CHECK FOR (any one fails the whole story):
+1. Character names other than "Sofía" (e.g. Marcus, Andrea, Lauren, David)
+2. Incoming contact actually arrives for Sofía: a call rings, a notification banner appears, the phone buzzes with a new message, or a voicemail is received. NOTE: Sofía waiting for contact, the phone being silent, or references to not having heard back are NOT violations — the silence is the point of the story
+3. The word "${objectWord}" appearing literally in the story
+4. Story ends mid-sentence
+5. Opening sentence has "light" or "the light" as its grammatical subject`,
+      }],
+    }),
+  })
+  const data = await res.json()
+  const content: string = data.choices?.[0]?.message?.content ?? '{}'
+  console.log('[subtext] validator response:', content)
+  try {
+    const match = content.match(/\{[\s\S]*\}/)
+    if (match) return (JSON.parse(match[0]) as { valid: boolean }).valid === true
+  } catch { /* fall through */ }
+  return true
+}
+
 // ─── Streaming helper ─────────────────────────────────────────────────────────
 
 async function streamOpenRouter(
@@ -85,14 +189,9 @@ async function streamOpenRouter(
 ) {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'http://localhost:3001',
-      'X-Title': 'Subtext',
-    },
+    headers: OPENROUTER_HEADERS,
     body: JSON.stringify({
-      model: 'anthropic/claude-opus-4',
+      model: 'anthropic/claude-opus-4.7',
       stream: true,
       max_tokens: type === 'personal' ? 700 : 400,
       messages: [
@@ -139,25 +238,34 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let personalText = ''
+
       try {
+        const personalPrompt = intake.storyId === 'table'
+          ? buildPersonalPrompt(story.architecture, story.newsEvent, intake)
+          : buildGenericPrompt(story.architecture, story.newsEvent, intake)
+
         await Promise.all([
-          streamOpenRouter(
-            LITERARY_SYSTEM,
-            buildPersonalPrompt(story.architecture, intake),
-            'personal',
-            controller,
-            encoder
-          ),
-          streamOpenRouter(
-            NEWS_SYSTEM,
-            buildNewsPrompt(story.newsEvent),
-            'news',
-            controller,
-            encoder
-          ),
+          // Personal: generate → validate → retry once if needed
+          (async () => {
+            for (let attempt = 0; attempt < 2; attempt++) {
+              const text = await generateOpenRouter(LITERARY_SYSTEM, personalPrompt)
+              const valid = await validateStory(text, intake.object ?? '')
+              console.log(`[subtext] personal attempt ${attempt + 1}: ${valid ? 'PASS' : 'FAIL'}`)
+              personalText = text
+              if (valid) break
+            }
+          })(),
+          // News: stream immediately while personal is being validated
+          streamOpenRouter(NEWS_SYSTEM, buildNewsPrompt(story.newsEvent), 'news', controller, encoder),
         ])
       } catch (err) {
         console.error('Generation error:', err)
+      }
+
+      const fullPersonal = personalText + (story.closingLine ?? '')
+      if (fullPersonal) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'personal', text: fullPersonal })}\n\n`))
       }
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`))
       controller.close()
