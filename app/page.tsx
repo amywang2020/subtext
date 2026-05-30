@@ -8,11 +8,10 @@ type Phase = 'landing' | 'intake' | 'transition' | 'story' | 'select'
 type TransitionStep = 'blank' | 'moment' | 'familiar' | 'fixed' | 'brought'
 
 interface IntakeAnswers {
-  sound: string
-  object: string
+  book: string
+  listened: string
   presence: string
   phone: string
-  goingAfter: string
 }
 
 interface Story {
@@ -101,15 +100,17 @@ const QUESTIONS: Array<{
   prompt: string
   options?: string[]
   placeholder?: string
+  quickOption?: string
 }> = [
   {
-    id: 'sound',
-    prompt: 'What does it sound like where you are?',
+    id: 'book',
+    prompt: 'What\'s the last book you read?',
     placeholder: '',
+    quickOption: 'I can\'t remember',
   },
   {
-    id: 'object',
-    prompt: 'What\'s the nearest object to your left hand right now?',
+    id: 'listened',
+    prompt: 'What\'s the last thing you listened to?',
     placeholder: '',
   },
   {
@@ -121,11 +122,6 @@ const QUESTIONS: Array<{
     id: 'phone',
     prompt: 'Is your phone face-up or face-down right now?',
     options: ['face-up', 'face-down', 'I don\'t have it with me'],
-  },
-  {
-    id: 'goingAfter',
-    prompt: 'After this, where are you going?',
-    placeholder: '',
   },
 ]
 
@@ -142,6 +138,27 @@ function formatTime(date: Date): string {
   const hour = h % 12 || 12
   const min = m.toString().padStart(2, '0')
   return `${hour}:${min} ${period}`
+}
+
+// Turn per-question answer times into a behavioral signal. In a co-located
+// room, this is one of the few things that actually varies per reader.
+function summarizeHesitation(hes: Record<string, number>): { pace: string; hesitation: string } {
+  const entries = Object.entries(hes)
+  if (entries.length === 0) return { pace: 'at an even pace', hesitation: '' }
+  const times = entries.map(([, t]) => t).sort((a, b) => a - b)
+  const median = times[Math.floor(times.length / 2)]
+  const pace = median > 7 ? 'slowly, with deliberation'
+    : median < 2.5 ? 'quickly, almost without thinking'
+    : 'at an even pace'
+  const [longId, longSec] = entries.reduce((a, b) => (b[1] > a[1] ? b : a))
+  const phrase: Record<string, string> = {
+    phone: 'they hesitated before saying where their phone was',
+    presence: 'they paused before deciding whether they were here or somewhere else',
+    listened: 'they paused over what they had last listened to',
+    book: 'they hesitated about the last book they read',
+  }
+  const hesitation = longSec > median * 1.8 && longSec > 4 ? (phrase[longId] ?? '') : ''
+  return { pace, hesitation }
 }
 
 // ─── Landing ──────────────────────────────────────────────────────────────────
@@ -245,26 +262,36 @@ function IntakeQuestion({
             ))}
           </div>
         ) : (
-          <div className="intake-text-wrap">
-            <input
-              ref={inputRef}
-              className="intake-text-input"
-              type="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleTextSubmit()}
-              placeholder={question.placeholder ?? ''}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-            />
-            <button
-              className={`intake-text-submit${text.trim() ? ' visible' : ''}`}
-              onClick={handleTextSubmit}
-            >
-              →
-            </button>
-          </div>
+          <>
+            <div className="intake-text-wrap">
+              <input
+                ref={inputRef}
+                className="intake-text-input"
+                type="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleTextSubmit()}
+                placeholder={question.placeholder ?? ''}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+              />
+              <button
+                className={`intake-text-submit${text.trim() ? ' visible' : ''}`}
+                onClick={handleTextSubmit}
+              >
+                →
+              </button>
+            </div>
+            {question.quickOption && (
+              <button
+                className="intake-quick"
+                onClick={() => onSelect(question.id, question.quickOption!)}
+              >
+                {question.quickOption}
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -323,7 +350,7 @@ function EvalQuestion() {
       </p>
       {open && (
         <p className="eval-what-text">
-          You answered five questions. This story was built from them — not to describe you,
+          You answered four questions. This story was built from them — not to describe you,
           but to arrive at your specific moment. We&rsquo;re asking how little it takes to produce
           that sensation.
         </p>
@@ -338,6 +365,7 @@ function StoryView({
   personalText,
   newsText,
   done,
+  recordRevealed,
   showEval,
   evalRating,
   evalNote,
@@ -352,6 +380,7 @@ function StoryView({
   personalText: string
   newsText: string
   done: boolean
+  recordRevealed: boolean
   showEval: boolean
   evalRating: string
   evalNote: string
@@ -363,37 +392,12 @@ function StoryView({
   onReadAnother: () => void
   onWhatIsThis: () => void
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    if (distFromBottom < 120) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-    }
-  }, [personalText, newsText])
-
   return (
-    <div className="story-screen" ref={scrollRef}>
-      <div className="story-grid">
+    <div className="story-screen">
+      <div className={`story-panes${recordRevealed ? ' with-record' : ''}`}>
 
-        {/* Left: the record */}
-        <div className="story-col">
-          <div className="col-header">
-            <span className="col-label">the record</span>
-            <p className="col-desc">The same event, rendered as news. Facts without a reader.</p>
-          </div>
-          <p className="news-text">
-            {newsText}
-            {!done && newsText.length > 0 && <span className="cursor" />}
-          </p>
-        </div>
-
-        <div className="story-divider" />
-
-        {/* Right: yours */}
-        <div className="story-col">
+        {/* Yours — streams from the top of its own scroll pane, no auto-follow */}
+        <div className="story-pane story-pane-yours">
           <div className="col-header">
             <span className="col-label">yours</span>
             <p className="col-desc">Generated with your context. The facts are fixed. What changes is everything you brought.</p>
@@ -402,59 +406,72 @@ function StoryView({
             {personalText}
             {!done && <span className="cursor" />}
           </p>
-        </div>
 
-        {/* Ending — spans both columns */}
-        {done && (
-          <div className="ending-block">
-            {showEval && !evalSubmitted && (
-              <>
-                <EvalQuestion />
-                <div className="eval-options">
-                  {(['yes', 'somewhat', 'not really'] as const).map(r => (
-                    <button
-                      key={r}
-                      className={`eval-option${evalRating === r ? ' eval-selected' : ''}`}
-                      onClick={() => onRate(r)}
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-                {evalRating && (
-                  <div className="eval-text-wrap">
-                    <input
-                      className="eval-text-input"
-                      type="text"
-                      placeholder="what did it get right? (optional)"
-                      value={evalNote}
-                      onChange={e => onNoteChange(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && onEvalSubmit()}
-                      autoFocus
-                      autoComplete="off"
-                    />
-                    <button className="eval-submit-btn" onClick={onEvalSubmit}>→</button>
+          {/* Ending / eval lives at the foot of the yours pane */}
+          {recordRevealed && (
+            <div className="ending-block">
+              {showEval && !evalSubmitted && (
+                <>
+                  <EvalQuestion />
+                  <div className="eval-options">
+                    {(['yes', 'somewhat', 'not really'] as const).map(r => (
+                      <button
+                        key={r}
+                        className={`eval-option${evalRating === r ? ' eval-selected' : ''}`}
+                        onClick={() => onRate(r)}
+                      >
+                        {r}
+                      </button>
+                    ))}
                   </div>
-                )}
-              </>
-            )}
-            {showEval && evalSubmitted && (
-              <>
-                <p className="eval-thanks">thank you.</p>
+                  {evalRating && (
+                    <div className="eval-text-wrap">
+                      <input
+                        className="eval-text-input"
+                        type="text"
+                        placeholder="in a few words — what made you say that?"
+                        value={evalNote}
+                        onChange={e => onNoteChange(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && onEvalSubmit()}
+                        autoFocus
+                        autoComplete="off"
+                      />
+                      <button
+                        className={`eval-submit-btn${evalNote.trim() ? '' : ' eval-submit-disabled'}`}
+                        onClick={onEvalSubmit}
+                      >→</button>
+                    </div>
+                  )}
+                </>
+              )}
+              {showEval && evalSubmitted && (
+                <>
+                  <p className="eval-thanks">thank you.</p>
+                  <div className="ending-actions">
+                    <button className="ending-btn" onClick={onReadAnother}>read another</button>
+                    <button className="ending-btn" onClick={onWhatIsThis}>what was this?</button>
+                  </div>
+                </>
+              )}
+              {!showEval && (
                 <div className="ending-actions">
                   <button className="ending-btn" onClick={onReadAnother}>read another</button>
                   <button className="ending-btn" onClick={onWhatIsThis}>what was this?</button>
                 </div>
-              </>
-            )}
-            {!showEval && (
-              <div className="ending-actions">
-                <button className="ending-btn" onClick={onReadAnother}>read another</button>
-                <button className="ending-btn" onClick={onWhatIsThis}>what was this?</button>
-              </div>
-            )}
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* The record — its own scroll pane, always mounted; pushes in from the
+            right and fades gently when revealed, then stays anchored/visible */}
+        <div className="story-pane story-pane-record" aria-hidden={!recordRevealed}>
+          <div className="col-header">
+            <span className="col-label">the record</span>
+            <p className="col-desc">The same event, rendered as news. Facts without a reader.</p>
           </div>
-        )}
+          <p className="news-text">{newsText}</p>
+        </div>
 
       </div>
     </div>
@@ -480,6 +497,10 @@ export default function SubtextApp() {
   const [evalNote, setEvalNote] = useState('')
   const [evalSubmitted, setEvalSubmitted] = useState(false)
   const [readerWord, setReaderWord] = useState('')
+  const [recordRevealed, setRecordRevealed] = useState(false)
+  const [profile, setProfile] = useState<Record<string, string> | null>(null)
+  const questionStartRef = useRef<number>(0)
+  const hesitationsRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     const stored = localStorage.getItem('subtext_reader_word')
@@ -505,7 +526,14 @@ export default function SubtextApp() {
     }
   }, [phase])
 
+  // Reset the per-question timer whenever a new intake question appears.
+  useEffect(() => {
+    if (phase === 'intake') questionStartRef.current = Date.now()
+  }, [phase, qIndex])
+
   function handleSelect(id: string, val: string) {
+    const elapsed = (Date.now() - (questionStartRef.current || Date.now())) / 1000
+    hesitationsRef.current[id] = elapsed
     const updated = { ...answers, [id]: val } as Partial<IntakeAnswers>
     setAnswers(updated)
     if (qIndex < QUESTIONS.length - 1) {
@@ -518,6 +546,8 @@ export default function SubtextApp() {
   async function runTransition(finalAnswers: IntakeAnswers) {
     setPhase('transition')
     personalReadyRef.current = false
+    setRecordRevealed(false)
+    setProfile(null)
 
     streamStory(finalAnswers)
 
@@ -544,13 +574,15 @@ export default function SubtextApp() {
   }
 
   async function streamStory(finalAnswers: IntakeAnswers) {
+    const { pace, hesitation } = summarizeHesitation(hesitationsRef.current)
     const intake = {
       time: formatTime(new Date()),
-      sound: finalAnswers.sound,
-      object: finalAnswers.object,
+      book: finalAnswers.book,
+      listened: finalAnswers.listened,
       presence: finalAnswers.presence,
       phone: finalAnswers.phone,
-      goingAfter: finalAnswers.goingAfter,
+      pace,
+      hesitation,
       storyId: selectedStory.id,
     }
     setCapturedIntake(intake)
@@ -579,11 +611,17 @@ export default function SubtextApp() {
           const t = line.trim()
           if (!t.startsWith('data: ')) continue
           const raw = t.slice(6)
-          let parsed: { type: string; text?: string }
+          let parsed: { type: string; text?: string; profile?: Record<string, string> }
           try { parsed = JSON.parse(raw) } catch { continue }
 
+          if (parsed.type === 'profile' && parsed.profile) {
+            setProfile(parsed.profile)
+          }
           if (parsed.type === 'done') {
             setTimeout(() => setStoryDone(true), 5000)
+            // Fallback: ensure the record reveals even if the typewriter path
+            // never ran (empty/short personal text).
+            setTimeout(() => setRecordRevealed(true), 6000)
             return
           }
           if (parsed.type === 'personal' && parsed.text) {
@@ -593,7 +631,11 @@ export default function SubtextApp() {
               const tokens = chunk.split(/(\s+)/)
               let i = 0
               const reveal = () => {
-                if (i >= tokens.length) return
+                if (i >= tokens.length) {
+                  // Story finished typing → reveal "the record" as a second beat.
+                  setTimeout(() => setRecordRevealed(true), 5000)
+                  return
+                }
                 const batch = tokens.slice(i, i + 4).join('')
                 setPersonalText(prev => prev + batch)
                 i += 4
@@ -602,6 +644,7 @@ export default function SubtextApp() {
               reveal()
             } else {
               setPersonalText(prev => prev + chunk)
+              setTimeout(() => setRecordRevealed(true), 5000)
             }
           }
           if (parsed.type === 'news' && parsed.text) {
@@ -616,6 +659,7 @@ export default function SubtextApp() {
   }
 
   async function handleEvalSubmit() {
+    if (!evalNote.trim()) return  // note is required
     try {
       await fetch('/api/eval', {
         method: 'POST',
@@ -626,6 +670,7 @@ export default function SubtextApp() {
           rating: evalRating,
           note: evalNote,
           readerWord,
+          profile,
         }),
       })
     } catch { /* silent fail — demo continues regardless */ }
@@ -636,6 +681,8 @@ export default function SubtextApp() {
     setPhase('select')
     setReadMode('secondary')
     personalReadyRef.current = false
+    setRecordRevealed(false)
+    hesitationsRef.current = {}
     setQIndex(0)
     setAnswers({})
     setCapturedIntake(null)
@@ -658,6 +705,8 @@ export default function SubtextApp() {
           excludeId="table"
           onSelect={(story) => {
             setSelectedStory(story)
+            setRecordRevealed(false)
+            hesitationsRef.current = {}
             setQIndex(0)
             setAnswers({})
             setPersonalText('')
@@ -680,6 +729,7 @@ export default function SubtextApp() {
           personalText={personalText}
           newsText={newsText}
           done={storyDone}
+          recordRevealed={recordRevealed}
           showEval={readMode === 'primary'}
           evalRating={evalRating}
           evalNote={evalNote}

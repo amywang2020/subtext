@@ -250,6 +250,28 @@ body {
   opacity: 0.9;
 }
 
+.intake-quick {
+  border: none;
+  background: none;
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dark);
+  opacity: 0.3;
+  cursor: pointer;
+  margin-top: 1.6rem;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: opacity 200ms ease;
+  animation: fadeUp 0.5s ease 0.3s both;
+}
+
+.intake-quick:hover {
+  opacity: 0.7;
+}
+
 /* Transition */
 .transition-text {
   font-family: var(--font-garamond);
@@ -322,47 +344,59 @@ body {
   transition: opacity 150ms ease;
 }
 
-/* Story */
+/* Story — two independent scroll panes */
 .story-screen {
   position: fixed;
   inset: 0;
-  overflow-y: scroll;
-  scrollbar-width: none;
-  display: block;
+  overflow: hidden;
   animation: darkToCream 1.4s ease forwards;
 }
 
-.story-screen::-webkit-scrollbar {
-  display: none;
-}
-
-.story-grid {
-  max-width: 1160px;
-  margin: 0 auto;
-  padding: 12vh 2.5rem 20vh;
-  display: grid;
-  grid-template-columns: 1fr 1px 1fr;
-  grid-template-rows: auto;
-  align-items: start;
+.story-panes {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
   animation: fadeIn 1s ease 0.7s both;
 }
 
-.story-col {
-  padding: 0 3rem;
+.story-pane {
+  height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 12vh 3rem 16vh;
   min-width: 0;
 }
 
-.story-col:first-child {
+.story-pane::-webkit-scrollbar {
+  display: none;
+}
+
+/* Yours: fixed reading width. It holds still while the record pane grows beside
+   it; because the pair stays centered, yours slides gently left to make room. */
+.story-pane-yours {
+  width: min(620px, 46vw);
+  flex: 0 0 auto;
+}
+
+/* The record: collapsed to zero until revealed, then pushes in from the right
+   and fades in. Its own scroll pane — anchored and always visible afterward. */
+.story-pane-record {
+  width: 0;
   padding-left: 0;
-}
-
-.story-col:last-child {
   padding-right: 0;
+  opacity: 0;
+  overflow: hidden;
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  transition: width 0.7s ease, padding 0.7s ease, opacity 0.6s ease 0.25s;
 }
 
-.story-divider {
-  background: rgba(0, 0, 0, 0.1);
-  align-self: stretch;
+.story-panes.with-record .story-pane-record {
+  width: min(620px, 46vw);
+  padding-left: 3rem;
+  padding-right: 3rem;
+  opacity: 1;
+  overflow-y: auto;
 }
 
 .col-header {
@@ -424,10 +458,9 @@ body {
   animation: blink 1s step-end infinite;
 }
 
-/* Ending — spans both columns */
+/* Ending — sits at the foot of the "yours" pane */
 .ending-block {
-  grid-column: 1 / -1;
-  margin-top: 5rem;
+  margin-top: 4rem;
   padding-top: 2.5rem;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
   animation: fadeUp 1s ease 0.3s both;
@@ -467,18 +500,30 @@ body {
 }
 
 @media (max-width: 720px) {
-  .story-grid {
-    grid-template-columns: 1fr;
-    padding: 8vh 1.5rem 16vh;
+  /* On phones the panes can't sit side by side — stack them, let the page
+     scroll from the top, and fade "the record" in below once revealed. */
+  .story-screen { overflow-y: auto; }
+  .story-panes {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
   }
-  .story-divider { display: none; }
-  .story-col {
-    padding: 0 0 3rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    margin-bottom: 2rem;
+  .story-pane {
+    width: 100% !important;
+    height: auto;
+    overflow: visible;
+    padding: 8vh 1.5rem 6vh;
   }
-  .story-col:last-child { border-bottom: none; padding-bottom: 0; }
-  .ending-block { grid-column: 1; }
+  .story-pane-record {
+    display: none;
+    border-left: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  .story-panes.with-record .story-pane-record {
+    display: block;
+    padding: 6vh 1.5rem 16vh;
+    animation: fadeIn 1.4s ease both;
+  }
 }
 
 /* Eval widget — appears in ending block on cream background */
@@ -606,6 +651,11 @@ body {
   opacity: 0.9;
 }
 
+.eval-submit-disabled {
+  opacity: 0.15;
+  pointer-events: none;
+}
+
 .eval-thanks {
   font-family: var(--font-garamond);
   font-style: italic;
@@ -680,6 +730,16 @@ body {
 
 .reveal-compare-btn {
   opacity: 0.75;
+}
+
+.reveal-demo-btn {
+  opacity: 0.4;
+}
+
+.reveal-demo-on {
+  opacity: 0.9;
+  color: #b8863b;
+  text-decoration: none;
 }
 
 .reveal-reset-btn {
@@ -839,6 +899,71 @@ body {
   line-height: 1.5;
 }
 
+.reveal-card-pace,
+.compare-pace {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.72rem;
+  color: var(--text-light);
+  opacity: 0.5;
+  margin-top: 0.7rem;
+  line-height: 1.4;
+}
+
+.compare-pace {
+  font-size: 0.78rem;
+  margin-top: 0;
+}
+
+.reveal-card-profile {
+  font-family: var(--font-garamond);
+  font-style: italic;
+  font-size: 0.82rem;
+  color: #8a6a2f;
+  opacity: 0.8;
+  margin-top: 0.6rem;
+  line-height: 1.4;
+}
+
+/* Compare view — the inferred profile block */
+.compare-profile {
+  border-left: 2px solid rgba(184, 134, 59, 0.6);
+  padding-left: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.compare-profile-label {
+  font-family: var(--font-inter);
+  font-weight: 400;
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8a6a2f;
+  opacity: 0.9;
+}
+
+.compare-profile p:not(.compare-profile-label) {
+  font-family: var(--font-garamond);
+  font-style: italic;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: var(--text-light);
+  opacity: 0.8;
+}
+
+.compare-profile span {
+  font-family: var(--font-inter);
+  font-style: normal;
+  font-weight: 300;
+  opacity: 0.45;
+  margin-right: 0.5rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
 .reveal-empty {
   font-family: var(--font-inter);
   font-weight: 300;
@@ -985,4 +1110,502 @@ body {
 
 .modal-close:hover {
   opacity: 0.9;
+}
+
+/* ─── Deck (the reveal presentation) ──────────────────────────────────────── */
+
+:root {
+  --deck-var: #d8a96a;   /* reader answers — warm */
+  --deck-news: #8aa6b8;  /* the news layer — cool */
+}
+
+.deck {
+  position: fixed;
+  inset: 0;
+  background-color: var(--bg-dark);
+  color: var(--text-dark);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deck-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.5s ease both;
+}
+
+.deck-slide {
+  max-width: 980px;
+  width: 100%;
+  padding: 4rem 5vw;
+  max-height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.deck-slide::-webkit-scrollbar { display: none; }
+
+.deck-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* Typographic primitives */
+.deck-eyebrow {
+  font-family: var(--font-inter);
+  font-weight: 400;
+  font-size: 0.82rem;
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+  opacity: 0.62;
+  margin-bottom: 2.5rem;
+}
+
+.deck-title {
+  font-family: var(--font-garamond);
+  font-weight: 400;
+  font-size: 3.4rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.deck-title-sm {
+  font-family: var(--font-garamond);
+  font-weight: 400;
+  font-size: 1.9rem;
+  line-height: 1.4;
+  max-width: 760px;
+}
+
+.deck-lead {
+  font-family: var(--font-garamond);
+  font-style: italic;
+  font-size: 2.1rem;
+  line-height: 1.4;
+  max-width: 800px;
+}
+
+.deck-body {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 1.2rem;
+  line-height: 1.7;
+  opacity: 0.92;
+  max-width: 680px;
+  margin-top: 1.4rem;
+}
+
+.deck-spaced { margin-top: 2rem; }
+
+.deck-em {
+  font-family: var(--font-garamond);
+  font-style: italic;
+  opacity: 1;
+}
+
+.deck-sub {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+  margin-top: 2.2rem;
+  max-width: 640px;
+  line-height: 1.6;
+}
+
+.deck-dim { opacity: 0.4; }
+
+/* Live aggregate */
+.deck-huge {
+  font-family: var(--font-garamond);
+  font-weight: 500;
+  font-size: 7rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.deck-huge-of {
+  font-weight: 400;
+  opacity: 0.4;
+  font-size: 3.2rem;
+}
+
+.deck-breakdown {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  opacity: 0.62;
+  margin-top: 2rem;
+}
+
+/* Live notes */
+.deck-notes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem 3rem;
+  margin-top: 0.5rem;
+}
+
+.deck-note {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.deck-note-word {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: lowercase;
+  opacity: 0.4;
+}
+
+.deck-note-text {
+  font-family: var(--font-garamond);
+  font-style: italic;
+  font-size: 1.1rem;
+  line-height: 1.45;
+  opacity: 0.85;
+}
+
+@media (max-width: 720px) {
+  .deck-notes { grid-template-columns: 1fr; }
+}
+
+/* The fixed skeleton */
+.deck-skeleton {
+  font-family: var(--font-garamond);
+  font-size: 1.5rem;
+  line-height: 1.6;
+  max-width: 760px;
+}
+
+.deck-skeleton-close {
+  font-family: var(--font-garamond);
+  font-style: italic;
+  font-size: 1.25rem;
+  opacity: 0.55;
+  margin-top: 2rem;
+  max-width: 620px;
+}
+
+/* The prompt scaffold */
+.deck-scaffold {
+  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  text-align: left;
+  white-space: pre-wrap;
+  margin: 0.5rem auto 0;
+  max-width: 820px;
+  color: var(--text-dark);
+}
+
+.sc-fixed { color: var(--text-dark); opacity: 0.72; }
+.sc-var { color: var(--deck-var); opacity: 1; }
+.sc-news { color: var(--deck-news); opacity: 0.95; }
+
+.deck-legend {
+  display: flex;
+  gap: 2rem;
+  margin-top: 2.5rem;
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.deck-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-fixed { background: var(--text-dark); opacity: 0.4; }
+.dot-var { background: var(--deck-var); }
+.dot-news { background: var(--deck-news); }
+
+/* The pipeline */
+.deck-pipe {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.pipe-node {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.92rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 2px;
+  opacity: 1;
+}
+
+.pipe-node-end {
+  font-family: var(--font-garamond);
+  font-style: italic;
+  border-color: var(--deck-var);
+  color: var(--deck-var);
+  opacity: 1;
+}
+
+.pipe-arrow {
+  opacity: 0.35;
+  font-size: 1.2rem;
+}
+
+/* Live side-by-side */
+.deck-pair {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: 2.5rem;
+  margin-top: 1rem;
+  align-items: start;
+}
+
+.deck-pair-divider {
+  background: rgba(255, 255, 255, 0.1);
+  align-self: stretch;
+}
+
+.deck-pair-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.deck-pair-word {
+  font-family: var(--font-garamond);
+  font-size: 1.3rem;
+  opacity: 0.55;
+  letter-spacing: 0.02em;
+}
+
+.deck-pair-intake {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.deck-pair-intake p {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.85rem;
+  opacity: 0.78;
+  line-height: 1.4;
+}
+
+.deck-pair-label {
+  opacity: 0.4;
+  margin-right: 0.6rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.deck-pair-story {
+  font-family: var(--font-garamond);
+  font-size: 1.05rem;
+  line-height: 1.75;
+  opacity: 0.85;
+}
+
+@media (max-width: 720px) {
+  .deck-pair { grid-template-columns: 1fr; }
+  .deck-pair-divider { display: none; }
+}
+
+.deck-pair-pace {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--deck-var);
+  opacity: 0.85;
+  padding-bottom: 0.4rem;
+}
+
+/* "What it inferred" — the psychographic profile block in the side-by-side */
+.deck-pair-profile {
+  border-left: 2px solid var(--deck-var);
+  padding-left: 0.9rem;
+  margin-bottom: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.deck-pair-profile-label {
+  font-family: var(--font-inter);
+  font-weight: 400;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--deck-var);
+  opacity: 0.9;
+  margin-bottom: 0.15rem;
+}
+
+.deck-pair-profile p:not(.deck-pair-profile-label) {
+  font-family: var(--font-garamond);
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  opacity: 0.82;
+}
+
+.deck-pair-plabel {
+  font-family: var(--font-inter);
+  font-style: normal;
+  font-weight: 300;
+  opacity: 0.45;
+  margin-right: 0.5rem;
+  font-size: 0.64rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.pipe-node-infer {
+  border-color: var(--deck-var);
+  color: var(--deck-var);
+}
+
+.deck-hint-inline {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  opacity: 0.3;
+  margin-top: 2rem;
+  text-align: center;
+}
+
+/* The two layers */
+.deck-layers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  max-width: 760px;
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.deck-layer-h {
+  font-family: var(--font-inter);
+  font-weight: 400;
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-bottom: 0.9rem;
+}
+
+.deck-layer-b {
+  font-family: var(--font-garamond);
+  font-size: 1.15rem;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+
+@media (max-width: 720px) {
+  .deck-layers { grid-template-columns: 1fr; gap: 2rem; }
+}
+
+.deck-thesis {
+  margin-top: 2rem;
+  font-style: normal;
+  opacity: 1;
+}
+
+.deck-final-mark {
+  margin-top: 3.5rem;
+  letter-spacing: 0.2em;
+  opacity: 0.3;
+}
+
+/* Chrome */
+.deck-chrome {
+  position: fixed;
+  bottom: 1.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  z-index: 20;
+}
+
+.deck-arrow {
+  border: none;
+  background: none;
+  color: var(--text-dark);
+  font-size: 1.1rem;
+  cursor: pointer;
+  opacity: 0.3;
+  padding: 0.3rem 0.6rem;
+  transition: opacity 200ms ease;
+}
+
+.deck-arrow:hover:not(:disabled) { opacity: 0.8; }
+.deck-arrow:disabled { opacity: 0.1; cursor: default; }
+
+.deck-counter {
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  opacity: 0.35;
+  min-width: 3.5rem;
+  text-align: center;
+}
+
+.deck-keyhint {
+  position: fixed;
+  bottom: 1.7rem;
+  right: 2rem;
+  font-family: var(--font-inter);
+  font-weight: 300;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  opacity: 0.25;
+  z-index: 20;
+}
+
+@media (max-width: 720px) {
+  .deck-title { font-size: 2.3rem; }
+  .deck-lead { font-size: 1.5rem; }
+  .deck-huge { font-size: 4.5rem; }
+  .deck-huge-of { font-size: 2rem; }
+  .deck-keyhint { display: none; }
+  .deck-pipe { flex-wrap: wrap; }
 }

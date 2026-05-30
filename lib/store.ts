@@ -19,6 +19,7 @@ export interface Submission {
   rating: string
   note: string
   readerWord: string
+  profile?: Record<string, string>
 }
 
 // In-memory fallback for local dev without Upstash configured

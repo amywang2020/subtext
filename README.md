@@ -1,6 +1,6 @@
 # Subtext
 
-A live demonstration built for BUSGEN 116. Five intake questions. One story. Every reader gets a different version.
+A live demonstration built for BUSGEN 116. Four intake questions. One story. Every reader gets a different version.
 
 The thesis: what is the minimum data required to produce the sensation of recognition — not accuracy, recognition?
 
@@ -62,8 +62,8 @@ Then redeploy to pick up the env vars.
 ## How it works
 
 **Generation** — reader intake answers enter the story through two channels:
-- *Sensory layer*: ambient sound, nearest object, time of day, where they're going — embedded in the scene without announcement
-- *Psychological layer*: presence (here vs. somewhere else) and phone position calibrate the character's emotional register
+- *What they carried in*: the last book read and the last thing listened to — inferred for sensibility and mood, never named in the scene
+- *Psychological & behavioral*: presence (here vs. somewhere else), phone position, and how long they hesitated answering calibrate the character's emotional register
 
 **Architecture** — news streams to the left column immediately while the personal story buffers and validates in parallel. A Haiku validator checks for five failure modes; if it fails, the story is regenerated once before displaying.
 

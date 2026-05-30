@@ -47,7 +47,7 @@ Switch to the `/reveal` tab on projector. Hit **refresh**.
 Show the aggregate first: *"X of Y felt recognized."* Let that land before explaining anything.
 
 Scroll through the cards. Point out:
-- How different the intake answers are (same five questions, very different answers)
+- How different the intake answers are (same four questions, very different answers)
 - How the rating correlates — or doesn't — with what people expected
 
 Ask: *"Find your card. What does it say next to your word?"*
